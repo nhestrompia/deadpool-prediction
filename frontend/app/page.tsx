@@ -211,7 +211,6 @@ export default function Page() {
           onBetAmountChange={setBetAmount}
           onBet={handleBet}
           canBet={canBet}
-          isPending={isPending}
         />
       </section>
 
