@@ -1,0 +1,11 @@
+{
+  "name": "deadpool-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "viem": "^2.45.1",
+    "ws": "^8.18.3"
+  }
+}

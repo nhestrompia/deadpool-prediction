@@ -1,0 +1,163 @@
+export const deadpoolArenaAbi = [
+  {
+    type: "function",
+    name: "deposit",
+    stateMutability: "payable",
+    inputs: [],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "withdraw",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "amount", type: "uint256" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "createMarket",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "question", type: "string" },
+      { name: "asset", type: "bytes32" },
+      { name: "strike", type: "uint256" },
+      { name: "above", type: "bool" },
+      { name: "resolveTime", type: "uint64" },
+    ],
+    outputs: [{ name: "marketId", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "resolveMarket",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "marketId", type: "uint256" },
+      { name: "outcome", type: "bool" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "resolveMarketAndSettle",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "marketId", type: "uint256" },
+      { name: "outcome", type: "bool" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "placeBet",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "marketId", type: "uint256" },
+      { name: "choice", type: "bool" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "resolveMyBet",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "getWallet",
+    stateMutability: "view",
+    inputs: [{ name: "user", type: "address" }],
+    outputs: [
+      { name: "balance", type: "uint256" },
+      { name: "lossStreak", type: "uint8" },
+      { name: "banned", type: "bool" },
+    ],
+  },
+  {
+    type: "function",
+    name: "getMarket",
+    stateMutability: "view",
+    inputs: [{ name: "marketId", type: "uint256" }],
+    outputs: [
+      { name: "question", type: "string" },
+      { name: "asset", type: "bytes32" },
+      { name: "strike", type: "uint256" },
+      { name: "above", type: "bool" },
+      { name: "resolveTime", type: "uint64" },
+      { name: "resolved", type: "bool" },
+      { name: "outcome", type: "bool" },
+    ],
+  },
+  {
+    type: "function",
+    name: "getActiveBet",
+    stateMutability: "view",
+    inputs: [{ name: "user", type: "address" }],
+    outputs: [
+      { name: "marketId", type: "uint256" },
+      { name: "amount", type: "uint256" },
+      { name: "choice", type: "bool" },
+      { name: "placedAt", type: "uint64" },
+    ],
+  },
+  {
+    type: "function",
+    name: "deadWalletCount",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "deadWalletAt",
+    stateMutability: "view",
+    inputs: [{ name: "index", type: "uint256" }],
+    outputs: [{ name: "", type: "address" }],
+  },
+  {
+    type: "function",
+    name: "getDeadWallets",
+    stateMutability: "view",
+    inputs: [
+      { name: "start", type: "uint256" },
+      { name: "count", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "address[]" }],
+  },
+  {
+    type: "function",
+    name: "nextMarketId",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "event",
+    name: "BetPlaced",
+    inputs: [
+      { name: "user", type: "address", indexed: true },
+      { name: "marketId", type: "uint256", indexed: true },
+      { name: "choice", type: "bool", indexed: false },
+      { name: "amount", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "BetResolved",
+    inputs: [
+      { name: "user", type: "address", indexed: true },
+      { name: "marketId", type: "uint256", indexed: true },
+      { name: "win", type: "bool", indexed: false },
+      { name: "amount", type: "uint256", indexed: false },
+      { name: "newBalance", type: "uint256", indexed: false },
+      { name: "lossStreak", type: "uint8", indexed: false },
+    ],
+  },
+] as const;
+
+export const deadpoolArenaAddress =
+  (process.env.NEXT_PUBLIC_DEADPOOL_ARENA_ADDRESS as
+    | `0x${string}`
+    | undefined) ?? undefined;
