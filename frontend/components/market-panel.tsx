@@ -26,35 +26,38 @@ export function MarketPanel({
 }) {
   return (
     <div className="flex h-full w-full flex-col justify-between gap-6 rounded-lg border-2 border-border bg-secondary-background p-4 shadow-shadow sm:p-6">
-      <div className="space-y-3">
+      <div className="space-y-4">
         <p className="text-xs uppercase tracking-[0.3em]">Current Market</p>
         <h2 className="text-xl font-heading sm:text-2xl break-words">
           {question}
         </h2>
-        <div className="flex flex-wrap gap-3 text-sm">
-          <span className="rounded-full border-2 border-border px-3 py-1">
-            Target: {strikeLabel}
-          </span>
-          {!resolved && !bettingClosed && (
-            <span className="rounded-full border-2 border-border px-3 py-1">
-              Betting closes in:{" "}
-              {secondsToClose !== null
-                ? `${Math.max(secondsToClose, 0)}s`
-                : "\u2014"}
-            </span>
-          )}
-          {bettingClosed && !resolved && (
-            <span className="rounded-full border-2 border-border bg-orange-100 px-3 py-1">
-              Betting closed
-            </span>
-          )}
-          <span className="rounded-full border-2 border-border px-3 py-1">
-            {resolved
-              ? "Resolved"
-              : secondsToResolve !== null
-                ? `Resolves in: ${Math.max(secondsToResolve, 0)}s`
-                : "\u2014"}
-          </span>
+        <div className="grid grid-cols-3 gap-4 border-t border-border pt-4 text-center">
+          <div>
+            <p className="text-xs text-muted-foreground">Target</p>
+            <p className="font-heading text-lg">{strikeLabel}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Betting</p>
+            <p className="font-heading text-lg tabular-nums">
+              {resolved
+                ? "Closed"
+                : bettingClosed
+                  ? "Closed"
+                  : secondsToClose !== null
+                    ? `${Math.max(secondsToClose, 0)}s`
+                    : "\u2014"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Resolves</p>
+            <p className="font-heading text-lg tabular-nums">
+              {resolved
+                ? "Done"
+                : secondsToResolve !== null
+                  ? `${Math.max(secondsToResolve, 0)}s`
+                  : "\u2014"}
+            </p>
+          </div>
         </div>
       </div>
 
