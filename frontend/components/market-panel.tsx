@@ -12,7 +12,6 @@ export function MarketPanel({
   onBetAmountChange,
   onBet,
   canBet,
-  isPending,
 }: {
   question: string;
   strikeLabel: string;
@@ -24,7 +23,6 @@ export function MarketPanel({
   onBetAmountChange: (v: string) => void;
   onBet: (choice: boolean) => void;
   canBet: boolean;
-  isPending: boolean;
 }) {
   return (
     <div className="flex h-full w-full flex-col justify-between gap-6 rounded-lg border-2 border-border bg-secondary-background p-4 shadow-shadow sm:p-6">

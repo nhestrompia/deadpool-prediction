@@ -16,7 +16,6 @@ const chartConfig = {
 } as const;
 
 export function PriceChart({ data }: { data: PricePoint[] }) {
-  const lastPoint = data[data.length - 1];
   const prices = data.map((point) => point.price);
   const minPrice = prices.length ? Math.min(...prices) : 0;
   const maxPrice = prices.length ? Math.max(...prices) : 0;
