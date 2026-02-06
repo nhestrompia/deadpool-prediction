@@ -1,16 +1,35 @@
 import { NextResponse } from "next/server";
 
-// Fetch 180 1-second candles from Binance (3 minutes of history)
-const BINANCE_KLINES_URL =
-  "https://api.binance.com/api/v3/klines?symbol=ETHUSDT&interval=1s&limit=180";
+// Fetch 180 1-second candles (3 minutes of history)
+const KLINES_ENDPOINTS = [
+  "https://api.binance.com/api/v3/klines?symbol=ETHUSDT&interval=1s&limit=180",
+  "https://data-api.binance.vision/api/v3/klines?symbol=ETHUSDT&interval=1s&limit=180",
+];
 
 export async function GET() {
   try {
-    const res = await fetch(BINANCE_KLINES_URL, {
-      next: { revalidate: 30 },
-    });
+    let res: Response | null = null;
+    for (const url of KLINES_ENDPOINTS) {
+      try {
+        const attempt = await fetch(url, {
+          headers: {
+            "User-Agent": "deadpool-arena/1.0",
+            Accept: "application/json",
+          },
+          cache: "no-store",
+          signal: AbortSignal.timeout(8000),
+        });
+        if (attempt.ok) {
+          res = attempt;
+          break;
+        }
+        console.warn(`Binance fetch failed: ${url} (${attempt.status})`);
+      } catch (error) {
+        console.warn(`Binance fetch error: ${url}`, error);
+      }
+    }
 
-    if (!res.ok) {
+    if (!res) {
       return NextResponse.json(
         { error: "Binance request failed" },
         { status: 502 },
