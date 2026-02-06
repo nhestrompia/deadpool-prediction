@@ -38,7 +38,7 @@ export function MarketPanel({
             Target: {strikeLabel}
           </span>
           <span className="rounded-full border-2 border-border px-3 py-1">
-            Betting closes in:{" "}
+            Closes in:{" "}
             {secondsToClose !== null
               ? `${Math.max(secondsToClose, 0)}s`
               : "\u2014"}
@@ -49,7 +49,7 @@ export function MarketPanel({
               : bettingClosed
                 ? "Betting closed"
                 : secondsToResolve !== null
-                  ? `Resolves in ${Math.max(secondsToResolve, 0)}s`
+                  ? `Resolves in: ${Math.max(secondsToResolve, 0)}s`
                   : "Open"}
           </span>
         </div>
@@ -68,7 +68,7 @@ export function MarketPanel({
             disabled={!canBet}
             onClick={() => onBet(true)}
           >
-            {isPending ? "Preparing..." : "YES"}
+            YES
           </Button>
           <Button
             className="flex-1"
@@ -76,7 +76,7 @@ export function MarketPanel({
             disabled={!canBet}
             onClick={() => onBet(false)}
           >
-            {isPending ? "Preparing..." : "NO"}
+            NO
           </Button>
         </div>
       </div>

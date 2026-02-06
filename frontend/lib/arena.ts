@@ -8,9 +8,26 @@ export const deadpoolArenaAbi = [
   },
   {
     type: "function",
+    name: "fundTreasury",
+    stateMutability: "payable",
+    inputs: [],
+    outputs: [],
+  },
+  {
+    type: "function",
     name: "withdraw",
     stateMutability: "nonpayable",
     inputs: [{ name: "amount", type: "uint256" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "withdrawTreasury",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
     outputs: [],
   },
   {
@@ -105,6 +122,34 @@ export const deadpoolArenaAbi = [
   {
     type: "function",
     name: "deadWalletCount",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "contractBalance",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "treasuryAvailable",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "totalBalances",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "totalLocked",
     stateMutability: "view",
     inputs: [],
     outputs: [{ name: "", type: "uint256" }],

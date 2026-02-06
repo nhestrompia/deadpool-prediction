@@ -4,10 +4,12 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { formatEther } from "viem";
 import { useConnection, useWriteContract } from "wagmi";
+import { waitForTransactionReceipt } from "wagmi/actions";
 
 import { AmountInput } from "@/components/amount-input";
 import { PastBetsSection } from "@/components/past-bets-section";
 import { Button } from "@/components/ui/button";
+import { config } from "@/config";
 import { useArenaWallet } from "@/hooks/useArenaWallet";
 import { usePastBets } from "@/hooks/usePastBets";
 import { deadpoolArenaAbi, deadpoolArenaAddress } from "@/lib/arena";
@@ -28,14 +30,15 @@ export default function WalletPage() {
   } = useArenaWallet();
 
   const { bets, isLoading: betsLoading } = usePastBets();
-  const writeContract = useWriteContract();
+  const { mutate: writeContract, isPending: isWritePending } =
+    useWriteContract();
 
   const [withdrawAmount, setWithdrawAmount] = useState("0.1");
-  const [pendingAction, setPendingAction] = useState<
-    "withdraw" | "resolve" | null
-  >(null);
+  const [isConfirming, setIsConfirming] = useState(false);
 
-  const handleWithdraw = async () => {
+  const isPending = isWritePending || isConfirming;
+
+  const handleWithdraw = () => {
     if (!deadpoolArenaAddress) {
       toast.error("Contract address missing.");
       return;
@@ -45,20 +48,43 @@ export default function WalletPage() {
       toast.error(parsed.error);
       return;
     }
-    try {
-      setPendingAction("withdraw");
-      await writeContract.mutateAsync({
+    if (balance < parsed.value) {
+      toast.error("Insufficient balance.");
+      return;
+    }
+
+    writeContract(
+      {
         address: deadpoolArenaAddress,
         abi: deadpoolArenaAbi,
         functionName: "withdraw",
         args: [parsed.value],
-      });
-      await refetchWallet();
-    } catch {
-      toast.error("Couldnt withdraw. Please try again.");
-    } finally {
-      setPendingAction(null);
-    }
+      },
+      {
+        onSuccess: async (hash) => {
+          const toastId = toast.loading("Confirming withdrawal...");
+          setIsConfirming(true);
+          try {
+            const receipt = await waitForTransactionReceipt(config, { hash });
+            toast.dismiss(toastId);
+            if (receipt.status === "success") {
+              toast.success("Withdrawal confirmed!");
+              refetchWallet();
+            } else {
+              toast.error("Withdrawal failed on-chain.");
+            }
+          } catch {
+            toast.dismiss(toastId);
+            toast.error("Failed to confirm withdrawal.");
+          } finally {
+            setIsConfirming(false);
+          }
+        },
+        onError: () => {
+          toast.error("Couldn't withdraw. Please try again.");
+        },
+      },
+    );
   };
 
   return (
@@ -96,7 +122,7 @@ export default function WalletPage() {
           <Button
             className="w-full sm:w-auto"
             disabled={
-              pendingAction !== null ||
+              isPending ||
               !isConnected ||
               !deadpoolArenaAddress ||
               hasActiveBet ||
@@ -104,7 +130,7 @@ export default function WalletPage() {
             }
             onClick={handleWithdraw}
           >
-            {pendingAction === "withdraw" ? "Preparing..." : "Withdraw ETH"}
+            {isPending ? "Processing..." : "Withdraw ETH"}
           </Button>
           {hasActiveBet && (
             <p className="text-xs text-orange-900">

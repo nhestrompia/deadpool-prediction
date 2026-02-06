@@ -8,6 +8,7 @@ contract DeadpoolArenaTest is Test {
     DeadpoolArena private arena;
     address private user = address(0xBEEF);
     address private user2 = address(0xCAFE);
+    address private user3 = address(0xB0B);
 
     event MarketCreated(
         uint256 indexed marketId,
@@ -32,6 +33,7 @@ contract DeadpoolArenaTest is Test {
         arena = new DeadpoolArena();
         vm.deal(user, 50 ether);
         vm.deal(user2, 50 ether);
+        vm.deal(user3, 50 ether);
     }
 
     function testCreateMarketOnlyOwner() public {
@@ -223,5 +225,123 @@ contract DeadpoolArenaTest is Test {
 
         vm.warp(resolveTime + 1);
         arena.resolveMarketAndSettle(0, true);
+    }
+
+    function testTotalsTrackDepositsAndBets() public {
+        uint64 resolveTime = uint64(block.timestamp + 1 hours);
+        arena.createMarket("ETH > 3000", bytes32("ETH"), 3000, true, resolveTime);
+
+        vm.prank(user);
+        arena.deposit{value: 5 ether}();
+        assertEq(arena.totalBalances(), 5 ether, "totalBalances after deposit");
+        assertEq(arena.totalLocked(), 0, "totalLocked starts at 0");
+
+        vm.prank(user);
+        arena.placeBet(0, true, 1 ether);
+        assertEq(arena.totalBalances(), 4 ether, "totalBalances after bet");
+        assertEq(arena.totalLocked(), 1 ether, "totalLocked after bet");
+
+        vm.warp(resolveTime + 1);
+        arena.resolveMarketAndSettle(0, false);
+        assertEq(arena.totalBalances(), 2 ether, "totalBalances after loss");
+        assertEq(arena.totalLocked(), 0, "totalLocked cleared");
+    }
+
+    function testTreasuryFundingAndWithdraw() public {
+        arena.fundTreasury{value: 10 ether}();
+        assertEq(arena.contractBalance(), 10 ether, "contract balance should reflect treasury");
+        assertEq(arena.treasuryAvailable(), 10 ether, "treasury available should match");
+
+        vm.prank(user);
+        arena.deposit{value: 5 ether}();
+
+        assertEq(arena.contractBalance(), 15 ether, "contract balance should include deposits");
+        assertEq(arena.treasuryAvailable(), 10 ether, "treasury excludes user balances");
+
+        arena.withdrawTreasury(address(0x123), 6 ether);
+        assertEq(arena.contractBalance(), 9 ether, "contract balance after treasury withdraw");
+        assertEq(arena.treasuryAvailable(), 4 ether, "treasury available after withdraw");
+
+        vm.expectRevert(bytes("Insufficient treasury"));
+        arena.withdrawTreasury(address(0x123), 10 ether);
+    }
+
+    function testBettingCloseWindowBlocksLastMinute() public {
+        uint64 resolveTime = uint64(block.timestamp + 2 minutes);
+        arena.createMarket("ETH > 3000", bytes32("ETH"), 3000, true, resolveTime);
+
+        vm.prank(user);
+        arena.deposit{value: 2 ether}();
+
+        vm.warp(resolveTime - 59);
+        vm.prank(user);
+        vm.expectRevert(bytes("Betting closed"));
+        arena.placeBet(0, true, 1 ether);
+    }
+
+    function testResolveMarketAndSettleMultipleBettors() public {
+        uint64 resolveTime = uint64(block.timestamp + 1 hours);
+        arena.createMarket("ETH > 3000", bytes32("ETH"), 3000, true, resolveTime);
+
+        vm.prank(user);
+        arena.deposit{value: 5 ether}();
+        vm.prank(user2);
+        arena.deposit{value: 5 ether}();
+
+        vm.prank(user);
+        arena.placeBet(0, true, 1 ether);
+        vm.prank(user2);
+        arena.placeBet(0, false, 2 ether);
+
+        vm.warp(resolveTime + 1);
+        arena.resolveMarketAndSettle(0, true);
+
+        (uint256 balance1,,) = arena.getWallet(user);
+        (uint256 balance2,,) = arena.getWallet(user2);
+        assertEq(balance1, 6 ether, "user should win");
+        assertEq(balance2, 0, "user2 should lose (clamped)");
+    }
+
+    function testSettleMarketBetsRequiresResolved() public {
+        uint64 resolveTime = uint64(block.timestamp + 1 hours);
+        arena.createMarket("ETH > 3000", bytes32("ETH"), 3000, true, resolveTime);
+
+        vm.expectRevert(bytes("Market not resolved"));
+        arena.settleMarketBets(0);
+    }
+
+    function testResolveMyBetStillWorks() public {
+        uint64 resolveTime = uint64(block.timestamp + 1 hours);
+        arena.createMarket("ETH > 3000", bytes32("ETH"), 3000, true, resolveTime);
+
+        vm.prank(user);
+        arena.deposit{value: 3 ether}();
+        vm.prank(user);
+        arena.placeBet(0, true, 1 ether);
+
+        vm.warp(resolveTime + 1);
+        arena.resolveMarket(0, true);
+
+        vm.prank(user);
+        arena.resolveMyBet();
+
+        (uint256 balance,,) = arena.getWallet(user);
+        assertEq(balance, 4 ether, "resolveMyBet should settle");
+    }
+
+    function testDeadWalletNotDuplicated() public {
+        vm.prank(user);
+        arena.deposit{value: 10 ether}();
+
+        for (uint256 i = 0; i < 3; i++) {
+            uint64 resolveTime = uint64(block.timestamp + 1 hours);
+            arena.createMarket("ETH > 3000", bytes32("ETH"), 3000, true, resolveTime);
+            vm.prank(user);
+            arena.placeBet(i, true, 1 ether);
+            vm.warp(resolveTime + 1);
+            arena.resolveMarketAndSettle(i, false);
+        }
+
+        assertEq(arena.deadWalletCount(), 1, "dead wallet should only be added once");
     }
 }

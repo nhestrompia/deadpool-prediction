@@ -1,13 +1,14 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { zeroAddress } from "viem";
-import { useReadContract } from "wagmi";
+import { useConnection, useReadContract, useWatchContractEvent } from "wagmi";
 
 import { deadpoolArenaAbi, deadpoolArenaAddress } from "@/lib/arena";
 
-import { useConnection } from "wagmi";
 export function useArenaWallet() {
   const { address } = useConnection();
+  const queryClient = useQueryClient();
   const contractAddress = deadpoolArenaAddress ?? zeroAddress;
 
   const { data: walletData, refetch: refetchWallet } = useReadContract({
@@ -17,7 +18,7 @@ export function useArenaWallet() {
     args: [address ?? zeroAddress],
     query: {
       enabled: Boolean(address && deadpoolArenaAddress),
-      refetchInterval: 8000,
+      refetchInterval: 5000,
     },
   });
 
@@ -28,7 +29,7 @@ export function useArenaWallet() {
     args: [address ?? zeroAddress],
     query: {
       enabled: Boolean(address && deadpoolArenaAddress),
-      refetchInterval: 8000,
+      refetchInterval: 5000,
     },
   });
 
@@ -47,6 +48,40 @@ export function useArenaWallet() {
     args: [activeBetMarketId],
     query: {
       enabled: hasActiveBet && Boolean(deadpoolArenaAddress),
+      refetchInterval: 5000,
+    },
+  });
+
+  // Watch for BetResolved events for this user to trigger immediate refresh
+  useWatchContractEvent({
+    address: contractAddress,
+    abi: deadpoolArenaAbi,
+    eventName: "BetResolved",
+    enabled: Boolean(address && deadpoolArenaAddress),
+    onLogs: (logs) => {
+      // Check if any log is for this user
+      const isForUser = logs.some(
+        (log) => log.args && "user" in log.args && log.args.user === address,
+      );
+      if (isForUser) {
+        queryClient.invalidateQueries({ queryKey: ["readContract"] });
+      }
+    },
+  });
+
+  // Watch for BetPlaced events for this user
+  useWatchContractEvent({
+    address: contractAddress,
+    abi: deadpoolArenaAbi,
+    eventName: "BetPlaced",
+    enabled: Boolean(address && deadpoolArenaAddress),
+    onLogs: (logs) => {
+      const isForUser = logs.some(
+        (log) => log.args && "user" in log.args && log.args.user === address,
+      );
+      if (isForUser) {
+        queryClient.invalidateQueries({ queryKey: ["readContract"] });
+      }
     },
   });
 

@@ -40,6 +40,8 @@ contract DeadpoolArena {
     uint256 public nextMarketId;
     address public owner;
     address public oracle;
+    uint256 public totalBalances;
+    uint256 public totalLocked;
 
     uint256 private constant _NOT_ENTERED = 1;
     uint256 private constant _ENTERED = 2;
@@ -66,6 +68,8 @@ contract DeadpoolArena {
     event Deposit(address indexed user, uint256 amount, uint256 newBalance);
     event Withdraw(address indexed user, uint256 amount, uint256 newBalance);
     event OracleUpdated(address indexed newOracle);
+    event TreasuryFunded(address indexed from, uint256 amount, uint256 contractBalance);
+    event TreasuryWithdrawn(address indexed to, uint256 amount, uint256 contractBalance);
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Not owner");
@@ -99,6 +103,22 @@ contract DeadpoolArena {
         emit OracleUpdated(newOracle);
     }
 
+    function fundTreasury() external payable onlyOwner {
+        require(msg.value > 0, "Amount zero");
+        emit TreasuryFunded(msg.sender, msg.value, address(this).balance);
+    }
+
+    function withdrawTreasury(address to, uint256 amount) external onlyOwner nonReentrant {
+        require(to != address(0), "Zero address");
+        require(amount > 0, "Amount zero");
+        uint256 available = _treasuryAvailable();
+        require(amount <= available, "Insufficient treasury");
+
+        (bool ok, ) = to.call{value: amount}("");
+        require(ok, "Withdraw failed");
+        emit TreasuryWithdrawn(to, amount, address(this).balance);
+    }
+
     function deposit() external payable nonReentrant {
         _deposit(msg.sender, msg.value);
     }
@@ -111,6 +131,7 @@ contract DeadpoolArena {
         require(wallet.balance >= amount, "Insufficient balance");
 
         wallet.balance -= amount;
+        totalBalances -= amount;
         (bool ok, ) = msg.sender.call{value: amount}("");
         require(ok, "Withdraw failed");
         emit Withdraw(msg.sender, amount, wallet.balance);
@@ -186,6 +207,8 @@ contract DeadpoolArena {
         require(wallet.balance >= amount, "Insufficient balance");
 
         wallet.balance -= amount;
+        totalBalances -= amount;
+        totalLocked += amount;
         activeBets[msg.sender] = Bet({
             marketId: marketId,
             amount: amount,
@@ -209,6 +232,7 @@ contract DeadpoolArena {
         require(market.resolved, "Market not resolved");
 
         Wallet storage wallet = wallets[msg.sender];
+        totalLocked -= bet.amount;
         _settleBet(msg.sender, bet, market, wallet);
 
         delete activeBets[msg.sender];
@@ -283,6 +307,14 @@ contract DeadpoolArena {
         return (bet.marketId, bet.amount, bet.choice, bet.placedAt);
     }
 
+    function contractBalance() external view returns (uint256) {
+        return address(this).balance;
+    }
+
+    function treasuryAvailable() external view returns (uint256) {
+        return _treasuryAvailable();
+    }
+
     function _initWallet(Wallet storage wallet) internal {
         if (!wallet.initialized) {
             wallet.initialized = true;
@@ -294,6 +326,7 @@ contract DeadpoolArena {
         Wallet storage wallet = wallets[user];
         _initWallet(wallet);
         wallet.balance += amount;
+        totalBalances += amount;
         emit Deposit(user, amount, wallet.balance);
     }
 
@@ -306,6 +339,7 @@ contract DeadpoolArena {
                 continue;
             }
             Wallet storage wallet = wallets[user];
+            totalLocked -= bet.amount;
             _settleBet(user, bet, market, wallet);
             delete activeBets[user];
         }
@@ -318,6 +352,7 @@ contract DeadpoolArena {
         Wallet storage wallet
     ) internal {
         bool win = bet.choice == market.outcome;
+        uint256 previousBalance = wallet.balance;
         if (win) {
             wallet.balance += bet.amount * 2;
             wallet.lossStreak = 0;
@@ -340,7 +375,21 @@ contract DeadpoolArena {
                 emit PlayerDead(user, bet.marketId, balanceBefore);
             }
         }
+        if (wallet.balance > previousBalance) {
+            totalBalances += wallet.balance - previousBalance;
+        } else if (wallet.balance < previousBalance) {
+            totalBalances -= previousBalance - wallet.balance;
+        }
 
         emit BetResolved(user, bet.marketId, win, bet.amount, wallet.balance, wallet.lossStreak);
+    }
+
+    function _treasuryAvailable() internal view returns (uint256) {
+        uint256 liabilities = totalBalances + totalLocked;
+        uint256 current = address(this).balance;
+        if (current > liabilities) {
+            return current - liabilities;
+        }
+        return 0;
     }
 }

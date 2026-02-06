@@ -1,18 +1,20 @@
 "use client";
 
 import { zeroAddress } from "viem";
-import { useReadContract } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
+import { useReadContract, useWatchContractEvent } from "wagmi";
 
 import { deadpoolArenaAbi, deadpoolArenaAddress } from "@/lib/arena";
 
 export function useArenaMarket() {
+  const queryClient = useQueryClient();
   const contractAddress = deadpoolArenaAddress ?? zeroAddress;
 
   const { data: nextMarketId } = useReadContract({
     address: contractAddress,
     abi: deadpoolArenaAbi,
     functionName: "nextMarketId",
-    query: { enabled: Boolean(deadpoolArenaAddress), refetchInterval: 8000 },
+    query: { enabled: Boolean(deadpoolArenaAddress), refetchInterval: 5000 },
   });
 
   const latestMarketId =
@@ -27,6 +29,18 @@ export function useArenaMarket() {
     args: latestMarketId !== null ? [latestMarketId] : undefined,
     query: {
       enabled: latestMarketId !== null && Boolean(deadpoolArenaAddress),
+      refetchInterval: 5000,
+    },
+  });
+
+  // Watch for BetResolved events to trigger market refresh (indicates market was resolved)
+  useWatchContractEvent({
+    address: contractAddress,
+    abi: deadpoolArenaAbi,
+    eventName: "BetResolved",
+    enabled: Boolean(deadpoolArenaAddress),
+    onLogs: () => {
+      queryClient.invalidateQueries({ queryKey: ["readContract"] });
     },
   });
 

@@ -54,8 +54,12 @@ export function BalancePanel({
           value={depositAmount}
           onChange={onDepositAmountChange}
         />
-        <Button className="w-full sm:w-auto" disabled={!canDeposit} onClick={onDeposit}>
-          {isPending ? "Preparing..." : "Deposit ETH"}
+        <Button
+          className="w-full sm:w-auto"
+          disabled={!canDeposit}
+          onClick={onDeposit}
+        >
+          Deposit ETH
         </Button>
       </div>
     </section>

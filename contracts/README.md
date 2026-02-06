@@ -20,6 +20,10 @@ Onchain prediction arena for the Deadpool MVP. Balances are backed by **native E
 - `getMarket(marketId)` returns `(question, asset, strike, above, resolveTime, resolved, outcome)`
 - `getActiveBet(user)` returns `(marketId, amount, choice, placedAt)`
 - `setOracle(newOracle)` `onlyOwner`
+- `fundTreasury()` payable `onlyOwner` to add house ETH (not credited to wallets)
+- `withdrawTreasury(to, amount)` `onlyOwner` to withdraw surplus
+- `contractBalance()` returns the contract's ETH balance
+- `treasuryAvailable()` returns the withdrawable surplus (contract balance minus user balances and locked bets)
 - `deadWalletCount()` returns total dead wallets
 - `deadWalletAt(index)` returns a dead wallet by index
 - `getDeadWallets(start, count)` returns a slice for pagination
@@ -34,6 +38,8 @@ Events are the source of truth for live feed, wall of shame, and leaderboard:
 - `PlayerDead(user, marketId, balanceBefore)`
 - `Deposit(user, amount, newBalance)`
 - `Withdraw(user, amount, newBalance)`
+- `TreasuryFunded(from, amount, contractBalance)`
+- `TreasuryWithdrawn(to, amount, contractBalance)`
 
 Use `PlayerDead` to build the Wall of Shame (sorted newest first). Use `BetResolved` for balance/streak updates.
 
@@ -59,3 +65,8 @@ forge script script/Deploy.s.sol:Deploy --rpc-url <RPC_URL> --private-key <PRIVA
 - Dead wallets are stored on-chain for the Wall of Shame UI.
 - Betting closes 60 seconds before the market resolve time.
 - Bet economics: `amount` is deducted at placement, then on resolution wins add `amount * 2` and losses subtract `amount * 2`.
+- The owner should seed the contract treasury to cover payouts when winners exceed losers.
+
+# To fund the contract treasury
+
+forge script script/FundTreasury.s.sol:FundTreasury --rpc-url https://public.sepolia.rpc.status.network --broadcast

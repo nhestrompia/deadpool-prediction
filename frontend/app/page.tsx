@@ -2,12 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { formatEther } from "viem";
 import { useConnection, useWriteContract } from "wagmi";
+import { waitForTransactionReceipt } from "wagmi/actions";
 
 import { BalancePanel } from "@/components/balance-panel";
 import { MarketPanel } from "@/components/market-panel";
 import { PriceSection } from "@/components/price-section";
+import { config } from "@/config";
 import { useArenaMarket } from "@/hooks/useArenaMarket";
+import { useArenaTreasury } from "@/hooks/useArenaTreasury";
 import { useArenaWallet } from "@/hooks/useArenaWallet";
 import { useEthPriceStream } from "@/hooks/useEthPriceStream";
 import { deadpoolArenaAbi, deadpoolArenaAddress } from "@/lib/arena";
@@ -28,14 +32,17 @@ export default function Page() {
     refetchWallet,
   } = useArenaWallet();
 
-  const writeContract = useWriteContract();
+  const { contractBalance, totalBalances, totalLocked } = useArenaTreasury();
+
+  const { mutate: writeContract, isPending: isWritePending } =
+    useWriteContract();
 
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
   const [betAmount, setBetAmount] = useState("0.1");
   const [depositAmount, setDepositAmount] = useState("0.5");
-  const [pendingAction, setPendingAction] = useState<"deposit" | "bet" | null>(
-    null,
-  );
+  const [isConfirming, setIsConfirming] = useState(false);
+
+  const isPending = isWritePending || isConfirming;
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -64,10 +71,10 @@ export default function Page() {
     !resolved &&
     latestMarketId !== null &&
     !banned &&
-    pendingAction === null;
+    !isPending;
 
   // Handlers
-  const handleDeposit = async () => {
+  const handleDeposit = () => {
     if (!deadpoolArenaAddress) {
       toast.error("Contract address missing.");
       return;
@@ -77,24 +84,42 @@ export default function Page() {
       toast.error(parsed.error);
       return;
     }
-    try {
-      setPendingAction("deposit");
-      await writeContract.mutateAsync({
+
+    writeContract(
+      {
         address: deadpoolArenaAddress,
         abi: deadpoolArenaAbi,
         functionName: "deposit",
         value: parsed.value,
-      });
-      await refetchWallet();
-      toast.success("Deposit successful!");
-    } catch {
-      toast.error("Couldnt deposit. Please try again.");
-    } finally {
-      setPendingAction(null);
-    }
+      },
+      {
+        onSuccess: async (hash) => {
+          const toastId = toast.loading("Confirming deposit...");
+          setIsConfirming(true);
+          try {
+            const receipt = await waitForTransactionReceipt(config, { hash });
+            toast.dismiss(toastId);
+            if (receipt.status === "success") {
+              toast.success("Deposit confirmed!");
+              refetchWallet();
+            } else {
+              toast.error("Deposit failed on-chain.");
+            }
+          } catch {
+            toast.dismiss(toastId);
+            toast.error("Failed to confirm deposit.");
+          } finally {
+            setIsConfirming(false);
+          }
+        },
+        onError: () => {
+          toast.error("Couldn't deposit. Please try again.");
+        },
+      },
+    );
   };
 
-  const handleBet = async (choice: boolean) => {
+  const handleBet = (choice: boolean) => {
     if (!deadpoolArenaAddress || latestMarketId === null) {
       toast.error("No active market.");
       return;
@@ -108,21 +133,39 @@ export default function Page() {
       toast.error("Insufficient balance. Please deposit first.");
       return;
     }
-    try {
-      setPendingAction("bet");
-      await writeContract.mutateAsync({
+
+    writeContract(
+      {
         address: deadpoolArenaAddress,
         abi: deadpoolArenaAbi,
         functionName: "placeBet",
         args: [latestMarketId, choice, parsed.value],
-      });
-      await refetchWallet();
-      toast.success("Bet placed!");
-    } catch {
-      toast.error("Couldnt place bet. Please try again.");
-    } finally {
-      setPendingAction(null);
-    }
+      },
+      {
+        onSuccess: async (hash) => {
+          const toastId = toast.loading("Confirming bet...");
+          setIsConfirming(true);
+          try {
+            const receipt = await waitForTransactionReceipt(config, { hash });
+            toast.dismiss(toastId);
+            if (receipt.status === "success") {
+              toast.success("Bet placed!");
+              refetchWallet();
+            } else {
+              toast.error("Bet failed on-chain.");
+            }
+          } catch {
+            toast.dismiss(toastId);
+            toast.error("Failed to confirm bet.");
+          } finally {
+            setIsConfirming(false);
+          }
+        },
+        onError: () => {
+          toast.error("Couldn't place bet. Please try again.");
+        },
+      },
+    );
   };
 
   return (
@@ -133,6 +176,26 @@ export default function Page() {
           <span className="font-mono"> frontend/.env</span> to enable betting.
         </p>
       )}
+      <section className="rounded-lg border-2 border-border bg-secondary-background p-4 shadow-shadow sm:p-6">
+        <p className="text-xs uppercase tracking-[0.3em]">Arena Treasury</p>
+        <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+          <p>
+            Contract balance:{" "}
+            <strong>
+              {Number(formatEther(contractBalance)).toFixed(4)} ETH
+            </strong>
+          </p>
+
+          <p>
+            User balances:{" "}
+            <strong>{Number(formatEther(totalBalances)).toFixed(4)} ETH</strong>
+          </p>
+          <p>
+            Locked in bets:{" "}
+            <strong>{Number(formatEther(totalLocked)).toFixed(4)} ETH</strong>
+          </p>
+        </div>
+      </section>
 
       <section className="grid gap-8 lg:grid-cols-[2fr_1fr]">
         <PriceSection series={series} price={price} />
@@ -148,7 +211,7 @@ export default function Page() {
           onBetAmountChange={setBetAmount}
           onBet={handleBet}
           canBet={canBet}
-          isPending={pendingAction === "bet"}
+          isPending={isPending}
         />
       </section>
 
@@ -163,12 +226,9 @@ export default function Page() {
         onDepositAmountChange={setDepositAmount}
         onDeposit={handleDeposit}
         canDeposit={
-          isConnected &&
-          Boolean(deadpoolArenaAddress) &&
-          !banned &&
-          pendingAction === null
+          isConnected && Boolean(deadpoolArenaAddress) && !banned && !isPending
         }
-        isPending={pendingAction === "deposit"}
+        isPending={isPending}
       />
     </main>
   );

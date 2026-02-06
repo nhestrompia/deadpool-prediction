@@ -71,6 +71,8 @@ const walletClient = createWalletClient({ account, transport: http(RPC_URL) });
 
 let latestPrice = null;
 let currentMarketId = null;
+let isTicking = false;
+let isCreating = false;
 
 function toBytes32(text) {
   return toHex(text, { size: 32 });
@@ -120,26 +122,38 @@ async function initMarketPointer() {
 }
 
 async function createMarket() {
+  if (isCreating) return;
+  isCreating = true;
+  try {
   if (!latestPrice) return;
   const strike = Math.round(latestPrice + PRICE_OFFSET);
   const resolveTime = Math.floor(Date.now() / 1000) + MARKET_INTERVAL_SEC;
   const minutes = Math.max(1, Math.round(MARKET_INTERVAL_SEC / 60));
   const question = `Will ETH be ${strike} in ${minutes} minutes?`;
 
-  await walletClient.writeContract({
+  const hash = await walletClient.writeContract({
     address: CONTRACT_ADDRESS,
     abi: arenaAbi,
     functionName: "createMarket",
     args: [question, toBytes32("ETH"), BigInt(strike), true, resolveTime],
   });
 
+  await publicClient.waitForTransactionReceipt({ hash });
+
   const nextMarketId = await publicClient.readContract({
     address: CONTRACT_ADDRESS,
     abi: arenaAbi,
     functionName: "nextMarketId",
   });
+  if (nextMarketId === 0n) {
+    currentMarketId = null;
+    return;
+  }
   currentMarketId = nextMarketId - 1n;
   console.log(`Opened market #${currentMarketId} at strike ${strike}`);
+  } finally {
+    isCreating = false;
+  }
 }
 
 async function resolveIfDue() {
@@ -172,6 +186,9 @@ async function resolveIfDue() {
 }
 
 async function tick() {
+  if (isTicking) return;
+  isTicking = true;
+  try {
   if (!latestPrice) return;
 
   if (currentMarketId === null) {
@@ -190,6 +207,9 @@ async function tick() {
 
   if (market[5]) {
     await createMarket();
+  }
+  } finally {
+    isTicking = false;
   }
 }
 
