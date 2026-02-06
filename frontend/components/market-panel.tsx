@@ -35,20 +35,25 @@ export function MarketPanel({
           <span className="rounded-full border-2 border-border px-3 py-1">
             Target: {strikeLabel}
           </span>
-          <span className="rounded-full border-2 border-border px-3 py-1">
-            Closes in:{" "}
-            {secondsToClose !== null
-              ? `${Math.max(secondsToClose, 0)}s`
-              : "\u2014"}
-          </span>
+          {!resolved && !bettingClosed && (
+            <span className="rounded-full border-2 border-border px-3 py-1">
+              Betting closes in:{" "}
+              {secondsToClose !== null
+                ? `${Math.max(secondsToClose, 0)}s`
+                : "\u2014"}
+            </span>
+          )}
+          {bettingClosed && !resolved && (
+            <span className="rounded-full border-2 border-border bg-orange-100 px-3 py-1">
+              Betting closed
+            </span>
+          )}
           <span className="rounded-full border-2 border-border px-3 py-1">
             {resolved
               ? "Resolved"
-              : bettingClosed
-                ? "Betting closed"
-                : secondsToResolve !== null
-                  ? `Resolves in: ${Math.max(secondsToResolve, 0)}s`
-                  : "Open"}
+              : secondsToResolve !== null
+                ? `Resolves in: ${Math.max(secondsToResolve, 0)}s`
+                : "\u2014"}
           </span>
         </div>
       </div>
